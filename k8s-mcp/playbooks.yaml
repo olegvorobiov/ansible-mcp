@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ansible-playbooks
+  namespace: cattle-ai-agent-system
+data:
+  # Smoke test — verifies the runner can SSH into every host in
+  # downstream_workers and run a trivial module. Equivalent to
+  # calling the MCP `ping_hosts` tool.
+  ping.yml: |
+    ---
+    - name: Smoke test — reach every host in inventory
+      hosts: all
+      gather_facts: false
+      tasks:
+        - name: Ping
+          ansible.builtin.ping:

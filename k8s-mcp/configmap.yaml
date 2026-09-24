@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ansible-config
+  namespace: cattle-ai-agent-system
+data:
+  ansible.cfg: |
+    [defaults]
+    inventory = /etc/ansible/hosts
+    host_key_checking = False
+    retry_files_enabled = False
+    interpreter_python = auto_silent
+    stdout_callback = yaml
+    deprecation_warnings = False
+    forks = 10
+    # MCP server overrides stdout_callback per-call via ANSIBLE_STDOUT_CALLBACK=json.
+    # `yaml` stays as the default so operator kubectl-exec runs remain readable.
+
+    [ssh_connection]
+    pipelining = True
+    ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+
+  hosts: |
+    # EDIT: ansible_host IPs must be reachable from this pod (via the VPN).
+    # Group by K8s role so playbooks can target precisely:
+    #   - patch/reboot playbooks  → hosts: downstream_workers
+    #   - read-only info on any node → hosts: all (or a specific host)
+    # Do NOT add server-role hosts to downstream_workers — patching the
+    # control plane mid-demo would reboot it.
+    all:
+      children:
+        downstream_servers:
+          hosts:
+            downstream-server-1:
+              ansible_host: 10.114.4.55
+            downstream-server-2:
+              ansible_host: 10.114.4.29
+            downstream-server-3:
+              ansible_host: 10.114.4.57
+        downstream_workers:
+          hosts:
+            downstream-worker-1:
+              ansible_host: 10.114.4.32
+
+  group_vars-all.yml: |
+    ---
+    # Credentials come from the ansible-ssh-credentials Secret, injected
+    # into the pod as env vars by the Deployment. They never touch disk.
+    ansible_user: "{{ lookup('env', 'ANSIBLE_SSH_USER') }}"
+    ansible_password: "{{ lookup('env', 'ANSIBLE_SSH_PASSWORD') }}"
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_password: "{{ lookup('env', 'ANSIBLE_SSH_PASSWORD') }}"
+    ansible_python_interpreter: /usr/bin/python3

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ansible-mcp
+  namespace: cattle-ai-agent-system
+  labels:
+    app: ansible-mcp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ansible-mcp
+  template:
+    metadata:
+      labels:
+        app: ansible-mcp
+    spec:
+      containers:
+        - name: ansible-mcp
+          image: docker.io/olegvorobyov90/ansible-mcp:0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: ANSIBLE_SSH_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ansible-ssh-credentials
+                  key: username
+            - name: ANSIBLE_SSH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ansible-ssh-credentials
+                  key: password
+            - name: PLAYBOOK_DIR
+              value: /playbooks
+          volumeMounts:
+            - name: ansible-config
+              mountPath: /etc/ansible/ansible.cfg
+              subPath: ansible.cfg
+            - name: ansible-config
+              mountPath: /etc/ansible/hosts
+              subPath: hosts
+            - name: ansible-config
+              mountPath: /etc/ansible/group_vars/all.yml
+              subPath: group_vars-all.yml
+            - name: playbooks
+              mountPath: /playbooks
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: ansible-config
+          configMap:
+            name: ansible-config
+        - name: playbooks
+          configMap:
+            name: ansible-playbooks
